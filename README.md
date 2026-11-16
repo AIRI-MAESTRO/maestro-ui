@@ -1,19 +1,19 @@
-# MAESTRO CARE — Collaborative Agent Reasoning Ecosystem
+# MAESTRO UI
 
-[![PyPI](https://img.shields.io/pypi/v/maestro-care.svg?logo=pypi&logoColor=white)](https://pypi.org/project/maestro-care/)
+MAESTRO UI provides the native desktop app, Textual TUI, and CLI for
+generating, running, and evolving agent chains. It connects
+[MAGE](https://github.com/AIRI-MAESTRO/mage) for generation,
+[CARL](https://github.com/AIRI-MAESTRO/carl) for execution,
+[IdeaL](https://github.com/AIRI-MAESTRO/ideal) for persistence, and
+[GigaEvo Platform](https://github.com/AIRI-MAESTRO/gigaevo-platform) for evolution.
 
-A native desktop workbench + Textual TUI + CLI for generating, running, and
-evolving agent chains. The desktop app uses a dedicated operating-system
-window; a browser is not part of the normal launch flow. CARE is the
-user-facing consumer on top of a four-module stack —
-the **agent chain generator** for chain generation, the **agent chain
-format** for execution, **GigaEvo Memory** for persistence, and
-**GigaEvo Platform** for evolution.
+[CARE](https://github.com/AIRI-MAESTRO/care) is a separate MAESTRO module.
+The `care` command alias, `CARE_*` settings, and legacy workbench
+documented below are compatibility interfaces in MAESTRO UI.
 
-Start desktop builds for macOS, Windows and Linux manually from **Actions → Desktop builds**.
-Download versioned binaries from [GitHub Releases](https://github.com/AIRI-MAESTRO/maestro-ui/releases).
-The [`main-build` prerelease](https://github.com/AIRI-MAESTRO/maestro-ui/releases/tag/main-build)
-tracks the most recent build published through the workflow.
+Start desktop builds for macOS, Windows, and Linux manually from
+**Actions → Desktop builds** in the public repository. Installers are published
+to [MAESTRO UI GitHub Releases](https://github.com/AIRI-MAESTRO/maestro-ui/releases).
 See [desktop CI and release instructions](packaging/desktop/README.md) for the
 target matrix, version bumps, runtime requirements and signing status.
 
@@ -96,7 +96,7 @@ typed status receipts. Cancelling evolution waits for its remote handle and
 then calls the typed evolution-cancel operation instead of knowingly orphaning
 the run.
 
-The reviewed CARE command tree is also available to the agent through four
+The reviewed MAESTRO UI command tree is also available to the agent through four
 shell-free tools: catalog, review, status, and confirm. Review executes only commands
 classified as read-only. An effectful form returns a public `challenge_id`;
 the actual one-use CommandBridge token never leaves the MCP process, and the
@@ -186,7 +186,7 @@ Missing tools must already exist in the reviewed/configured tool registry or
 the run fails closed.
 
 The baseline confirmation shows a bounded, secret-free preview of the pending
-effects together with short binding and provider/tool-state digests. CARE
+effects together with short binding and provider/tool-state digests. MAESTRO UI
 recomputes the state before execution and blocks the stage if it changed after
 confirmation. The digests identify the confirmed snapshot; they do not expose
 provider keys or other configuration values.
@@ -219,7 +219,7 @@ API-key inputs are write-only: an existing credential is represented only by
 "Credential configured" and is never returned to the WebView. Saving requires
 an explicit one-use confirmation. New credentials are written to versioned
 entries in the operating-system Keychain, while `config.toml` and the workspace
-`.env` receive only `keystore://...` references. CARE refuses plaintext/file
+`.env` receive only `keystore://...` references. MAESTRO UI refuses plaintext/file
 keystore fallback. Changing an endpoint or search provider while retaining a
 credential is also refused; replace or clear that credential in the same save
 so a key cannot silently cross provider boundaries. A project `care.toml` that
@@ -290,7 +290,7 @@ and py2app produces a local ad-hoc-signed bundle; Developer ID signing and Apple
 notarisation remain required before external distribution. The optional
 Keychain integration is still packaged as source only and does not include or
 activate a universal `.node` addon. Maestric images come from `care-landing`;
-reuse in this MAESTRO CARE application was explicitly authorised by the
+reuse in this MAESTRO UI application was explicitly authorised by the
 project owner for this integration. The exact source commit and files are
 recorded in `care/web_assets/ASSET_PROVENANCE.md`. The upstream repository
 should still add a machine-readable licence before unrelated third parties
@@ -312,7 +312,7 @@ configurable per-deployment with `CARE_CHAT__DEFAULT_MODE`.
 | Mode           | What happens on every prompt                                                                                                                                                                                                                                                                                             |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Ad-Hoc**     | The agent chain generator produces a chain, the agent chain format runs it on the spot, the answer prints inline. The agent may loop (ReAct) until it decides the task is done. **Nothing is saved.**                                                                                                                    |
-| **Production** | The agent chain generator produces a _reproducible_ chain, CARE saves it to Memory under a stable `chain_id`, runs one baseline to seed a dataset entry, and (when Platform is wired) kicks off an evolution run. Use `/dataset list <chain_id>` / `/dataset run <chain_id>` / `/evolution watch <run_id>` to follow up. |
+| **Production** | The agent chain generator produces a _reproducible_ chain, MAESTRO UI saves it to IdeaL under a stable `chain_id`, runs one baseline to seed a dataset entry, and (when Platform is wired) kicks off an evolution run. Use `/dataset list <chain_id>` / `/dataset run <chain_id>` / `/evolution watch <run_id>` to follow up. |
 
 Production requires `CARE_MEMORY__BASE_URL` (and `CARE_MEMORY__API_KEY`
 when the deployment enforces auth). Without Memory configured,
@@ -334,7 +334,7 @@ evolve A and accept the best individual back into the stable channel.
 
 ## Screens
 
-CARE ships **18+ screens** covering the full lifecycle:
+The MAESTRO UI TUI ships **18+ screens** covering the full lifecycle:
 
 | Screen                | Purpose                                                |
 | --------------------- | ------------------------------------------------------ |
@@ -393,15 +393,15 @@ a local relative link for offline reading).
 
 ## Architecture
 
-CARE is the consumer at the top of a four-module stack — see
+MAESTRO UI integrates the four modules above — see
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the layer-by-layer
 walk-through (generation / execution / persistence / evolution) with
-cross-links to the upstream modules and CARE's internal module
+cross-links to the upstream modules and MAESTRO UI's internal module
 boundaries.
 
 ## Configuration
 
-CARE reads its configuration from four sources, in increasing precedence:
+MAESTRO UI reads its configuration from four sources, in increasing precedence:
 
 1. Defaults baked into `care.config.CareConfig`.
 2. `~/.config/care/config.toml` (user-global TOML).
@@ -421,7 +421,7 @@ vars in your shell) and override only what you need.
 | Section     | Env-var prefix      | Purpose                                                                         |
 | ----------- | ------------------- | ------------------------------------------------------------------------------- |
 | `mage`      | `CARE_MAGE__*`      | Agent chain generator (provider, API key, …)                                    |
-| `memory`    | `CARE_MEMORY__*`    | GigaEvo Memory connection                                                       |
+| `memory`    | `CARE_MEMORY__*`    | IdeaL connection                                                       |
 | `platform`  | `CARE_PLATFORM__*`  | GigaEvo Platform connection                                                     |
 | `sandbox`   | `CARE_SANDBOX__*`   | AgentSkill sandbox backend + limits                                             |
 | `tools`     | `CARE_TOOLS__*`     | `@carl_tool` registry + bundled builtins (web_search, …) + on-the-fly synthesis |
