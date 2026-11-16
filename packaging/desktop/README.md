@@ -7,35 +7,18 @@ To publish a previous successful `main` build, enable `publish_release` and
 enter its run ID in `artifact_run_id`.
 
 
-`.github/workflows/desktop.yml` builds when manually requested, on pull requests,
-and on manual dispatch. Each target runs on its own native GitHub runner:
+Each target runs on its own native GitHub runner.
 
-| Platform | Architectures | Download |
+| Target | Architecture | Artifact |
 | --- | --- | --- |
-| macOS | ARM64, Intel x64 | DMG with Maestro.app and Applications link |
+| macOS | ARM64, x64 | DMG containing Maestro.app |
 | Linux | x64, ARM64 | tar.gz containing Maestro/ |
 | Windows | x64 | EXE installer with app, runtime and uninstaller |
 
-Every successful build uploads the archive and a SHA256 file as Actions
-artifacts (14-day retention). After all five targets succeed on a `main` push,
-an unreleased `[project].version` in `pyproject.toml` becomes a GitHub Release
-named `v<version>`, tagged at that exact commit. The first run bootstraps the
-current version. Every successful main push also refreshes the `main-build`
-prerelease and its tag to that exact commit. Later pushes with the same version
-replace only this development preview; versioned assets stay immutable.
-Bump the version to publish another stable release.
-Normal manual dispatch and pull requests only build; they never publish.
-To retry a failed publisher without rebuilding, manually dispatch with
-`artifact_run_id` set to the completed main build's Actions run ID. The workflow
-verifies the repository, push event, main branch, all five successful native
-jobs and non-expired artifacts before publishing at that build's exact commit.
-
-The release is created as a draft while assets upload, then published. A failed
-upload leaves a draft. Recovery resumes that draft only when its target matches
-the verified build commit. A pre-existing tag pointing elsewhere fails closed.
-GitHub restricts tagging older commits that modify workflows and no longer have
-a branch/tag ref. For such a recovery, a maintainer must first create the exact
-verified tag; ordinary releases from the current main head need no extra token.
+GitHub Actions retains the archives and checksums for 14 days. A run with
+`publish_release` publishes a new versioned release and updates the
+`main-build` prerelease only after all five archives pass verification.
+The workflow refuses to attach binaries to a version tag on a different commit.
 
 Builds include Python, runtime dependencies, integrations, and the official
 DeepSeek Harness executable and sidecars from pinned commit
