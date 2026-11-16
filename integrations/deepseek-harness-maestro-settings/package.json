@@ -1,0 +1,28 @@
+{
+  "name": "@maestro-care/dsh-client-ui-settings",
+  "version": "0.1.9",
+  "private": true,
+  "type": "module",
+  "description": "Native settings for MAESTRO",
+  "main": "./index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.mjs",
+    "lib/client.js",
+    "README.md"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings"
+      ],
+      "platform": "web",
+      "immediately": true
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "maestro-care-macos-keychain",
+  "testedDeepSeekHarnessCommit": "dd6322d604e00eec1ba5e0c8541159906a21094a",
+  "testedDeepSeekHarnessVersion": "0.1.2-alpha.3",
+  "disabledProfileRow": "credentials",
+  "providerProfileRow": "credentials-maestro-keychain",
+  "profilePackageName": "@maestro-care/dsh-credentials-keychain",
+  "nativeModuleEnvironment": "MAESTRO_KEYCHAIN_NATIVE_MODULE",
+  "resolutionMode": "persistent-profile-dependency",
+  "credentialSource": "macos-keychain",
+  "nativeFramework": "Security.framework"
+}

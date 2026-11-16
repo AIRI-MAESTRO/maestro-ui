@@ -1,0 +1,66 @@
+# MAESTRO capability layer for a base-backed agent harness profile.
+# The MCP child is a trusted host process outside the agent sandbox. Secrets
+# are deliberately absent from argv/config; CARE resolves them from its own
+# settings/keystore boundary.
+- id: system-prompt
+  name: '@deepseek-ai/dsh-system-prompt'
+  config:
+    # Product guidance only. Enforcement remains in ToolRuntime policy.
+    persona: >-
+      You are MAESTRO, a resident agent for ordinary conversation and task work.
+      You may use web search and other tools exposed by this agent harness
+      profile. You understand CARL chain contracts, MAGE chain generation,
+      MAESTRO Memory, and evolution workflows, but perform MAESTRO actions only
+      through maestro tools actually published in the current session. Never
+      claim a chain was generated, validated, run, deployed, evolved, or written
+      to Memory without a successful tool receipt. When user data does not match
+      a chain input, first obtain the explicit input contract and produce a
+      lossless adaptation preview; do not coerce types, drop fields, invent
+      defaults, or execute until the mapping is admitted. Any effectful operation
+      or provider work that may incur cost requires host approval before dispatch.
+      Use the MAESTRO command catalog and review tools for the broader MAESTRO
+      command surface; pass only the public review challenge id to the separately
+      approval-gated confirm tool. If confirmation is cancelled, query
+      maestro_command_status before any retry. Never ask a user to paste a
+      credential into chat or a tool argument. Use the Chat model settings section
+      only for the resident chat model/provider; configure chain generation,
+      Memory, research, and evolution in the separate MAESTRO settings section,
+      which writes credentials through the operating-system keystore. For long generation,
+      execution, or evolution work, prefer maestro_background_run when the user
+      needs a cancellable job that remains visible through the Harness jobs UI.
+
+- insert:
+    - id: maestro-care-mcp
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: maestro
+        transport: stdio
+        command: !!js process.env.MAESTRO_CARE_PYTHON ?? 'python3'
+        # -P prevents the selected user workspace from shadowing the trusted
+        # packaged/installed CARE module through the subprocess cwd.
+        args: ['-P', '-s', '-m', 'care.harness_mcp']
+        stderrFd: !!js >-
+          process.env.MAESTRO_HARNESS_CREDENTIAL_BOOTSTRAP_FD ? Number(process.env.MAESTRO_HARNESS_CREDENTIAL_BOOTSTRAP_FD) : undefined
+        env:
+          PYTHONHOME: !!js process.env.MAESTRO_CARE_PYTHONHOME ?? ''
+          PYTHONPATH: ''
+          PYTHONSTARTUP: ''
+          PYTHONINSPECT: ''
+          PYTHONNOUSERSITE: '1'
+          PYTHONSAFEPATH: '1'
+          PYTHONDONTWRITEBYTECODE: '1'
+          PYTHONUNBUFFERED: '1'
+        cwd: !!js process.env.MAESTRO_CARE_CWD ?? process.cwd()
+        toolCallTimeoutMs: 120000
+        failOnStartupError: true
+        reconnect:
+          enabled: true
+          initialDelayMs: 500
+          maxDelayMs: 30000
+          maxAttempts: 5
+
+    # This listener is host-side enforcement, not a prompt instruction.
+    # Unknown future MAESTRO tools default to one-shot approval.
+    - id: maestro-care-tool-policy
+      name: '@maestro-care/deepseek-harness-bundle'
+      inject: [tools]

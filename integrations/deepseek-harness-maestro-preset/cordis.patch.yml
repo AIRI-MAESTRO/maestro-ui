@@ -1,0 +1,15 @@
+# A Web session gets its model-facing tools and persona from an Agent preset,
+# not from the host-level system-prompt row.  Resolve this package's preset root
+# through a tiny provider plugin, then make the MAESTRO copy of `standard` the
+# default for sessions created after this bundle is mounted.
+- insert:
+    - id: maestro-agent-preset-root
+      name: ./preset-root.mjs
+
+- id: agent-presets
+  inject: [maestroAgentPresetRoot]
+  config:
+    default: maestro
+    roots:
+      - path: !!js ctx.maestroAgentPresetRoot
+        trust: system

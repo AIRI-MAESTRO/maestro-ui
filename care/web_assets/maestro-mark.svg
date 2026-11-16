@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-labelledby="title">
+  <title id="title">Maestro</title>
+  <defs>
+    <linearGradient id="maestro-gradient" x1="7" y1="5" x2="41" y2="43" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#45d2c1"/>
+      <stop offset="1" stop-color="#168f84"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#maestro-gradient)"/>
+  <path d="M11.5 32.5V15.5L24 27.75 36.5 15.5V32.5" fill="none" stroke="#fff" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="24" cy="35.5" r="2" fill="#fff"/>
+</svg>

@@ -1,0 +1,31 @@
+{
+  "name": "@maestro-care/dsh-client-ui-branding",
+  "version": "0.1.9",
+  "private": true,
+  "type": "module",
+  "description": "MAESTRO product identity and theme for the resident agent client",
+  "main": "./index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.mjs",
+    "lib/client.js",
+    "README.md",
+    "ASSET_PROVENANCE.md"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-theme"
+      ],
+      "platform": "web"
+    }
+  }
+}

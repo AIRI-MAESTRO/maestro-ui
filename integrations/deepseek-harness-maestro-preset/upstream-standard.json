@@ -1,0 +1,6 @@
+{
+  "deepSeekHarnessCommit": "dd6322d604e00eec1ba5e0c8541159906a21094a",
+  "source": "packages/preset/agent-presets/presets/standard/agent.cordis.yml",
+  "sha256": "f04fbc6ec6d38aab78f18690c293ddcb76293107f7e6cd157904b7c0e83094bd",
+  "allowedDifference": "persona.config.text"
+}

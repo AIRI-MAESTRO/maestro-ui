@@ -1,0 +1,26 @@
+{
+  "name": "@maestro-care/deepseek-harness-maestro-jobs",
+  "version": "0.1.9",
+  "private": true,
+  "type": "module",
+  "description": "MAESTRO background jobs for approved generation, execution, and evolution",
+  "main": "./index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "cordis.patch.yml",
+    "index.mjs",
+    "README.md"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test ./test/*.test.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

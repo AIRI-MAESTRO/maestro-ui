@@ -1,0 +1,335 @@
+name: Desktop builds
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      artifact_run_id:
+        description: 'Optional: retry publishing a completed main build without rebuilding'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# Finish each main commit in order so a version bump cannot be cancelled away.
+concurrency:
+  group: desktop-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  build:
+    if: github.event_name != 'workflow_dispatch' || inputs.artifact_run_id == ''
+    name: ${{ matrix.target }}-${{ matrix.arch }}
+    # Cold Linux ARM and native Mac builds exceeded their original job limits.
+    # Leave setup and cleanup time inside the four-hour supervision envelopes.
+    timeout-minutes: ${{ matrix.target == 'linux' && matrix.arch == 'arm64' && 225 || matrix.target == 'macos' && 225 || 60 }}
+    runs-on: ${{ fromJSON(vars.CI_RUNNERS || '{}')[matrix.runner] || matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: macos-15, target: macos, arch: arm64}
+          - {runner: macos-15-intel, target: macos, arch: x64}
+          - {runner: ubuntu-22.04, target: linux, arch: x64}
+          - {runner: ubuntu-22.04-arm, target: linux, arch: arm64}
+          - {runner: windows-2022, target: win, arch: x64}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: app
+          persist-credentials: false
+      - uses: actions/checkout@v5
+        with:
+          repository: deepseek-ai/deepseek-harness
+          ref: dd6322d604e00eec1ba5e0c8541159906a21094a
+          path: deepseek-harness
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        if: runner.os != 'macOS'
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.7.0'
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: deepseek-harness/pnpm-lock.yaml
+      - name: Initialize pnpm cache directory
+        # A Harness cache hit skips pnpm install, but setup-node still saves its cache.
+        run: mkdir -p -- "$(pnpm store path --silent)"
+      - name: Linux webview libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 xvfb
+      - name: Install app and build dependencies
+        working-directory: app
+        run: |
+          case "$RUNNER_OS/${{ matrix.arch }}" in
+            macOS/arm64) desktop_python=cpython-3.12-macos-aarch64-none ;;
+            macOS/x64) desktop_python=cpython-3.12-macos-x86_64-none ;;
+            macOS/*) echo 'Unsupported macOS Python architecture' >&2; exit 1 ;;
+            *) desktop_python=3.12 ;;
+          esac
+          uv venv --python "$desktop_python"
+          if [ "$RUNNER_OS" = macOS ]; then
+            uv run --no-sync python -c "import platform, struct, sys; assert sys.version_info[:2] == (3, 12); assert struct.calcsize('P') == 8; assert sys.platform == 'darwin'; assert platform.machine() == {'arm64': 'arm64', 'x64': 'x86_64'}['${{ matrix.arch }}']; print(platform.python_version(), platform.machine(), struct.calcsize('P') * 8)"
+          fi
+          uv pip install '.[desktop,carl,openai,anthropic,dev]' 'pyinstaller>=6.16,<7'
+          if [ "$RUNNER_OS" = Linux ]; then uv pip install 'PySide6>=6.8,<7' qtpy; fi
+      - name: Packaging and runtime tests
+        working-directory: app
+        run: |
+          uv run --no-sync pytest tests/test_packaging.py tests/test_desktop_release.py tests/test_windows_credentials.py -q
+          if [ "$RUNNER_OS" != Windows ]; then
+            uv run --no-sync pytest tests/test_deepseek_host.py tests/test_desktop.py tests/test_credential_broker.py tests/test_credential_broker_noninteractive.py -q
+          fi
+      - name: Cache pinned native Harness runtime
+        id: harness-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: deepseek-harness/python/sdk-runtime/src/deepseek_harness_runtime/runtime
+          key: dsh-dd6322d604e00eec1ba5e0c8541159906a21094a-${{ matrix.target }}-${{ matrix.arch }}-${{ hashFiles('app/packaging/desktop/harness-stderr.patch') }}
+      - name: Build official pinned Harness executable
+        if: steps.harness-cache.outputs.cache-hit != 'true'
+        working-directory: deepseek-harness
+        run: |
+          # Windows checkout converts TypeScript to CRLF; patches use LF.
+          uv run --no-project python -c "from pathlib import Path; patch = Path('../app/packaging/desktop/harness-stderr.patch'); paths = [patch, *[Path(line[6:]) for line in patch.read_text().splitlines() if line.startswith('+++ b/')]]; [p.write_bytes(p.read_bytes().replace(b'\r\n', b'\n')) for p in paths]"
+          git apply ../app/packaging/desktop/harness-stderr.patch
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run packages/client/modules/tests/node-half.client.spec.ts
+          pnpm exec tsx scripts/build-exe-for-python-sdk.ts --targets=node24-${{ matrix.target }}-${{ matrix.arch }}
+      - name: Save built pinned Harness runtime
+        if: steps.harness-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: deepseek-harness/python/sdk-runtime/src/deepseek_harness_runtime/runtime
+          key: ${{ steps.harness-cache.outputs.cache-primary-key }}
+      - name: Package desktop app
+        working-directory: app
+        run: |
+          uv run --no-sync python scripts/desktop_release.py prepare --target ${{ matrix.target }} --arch ${{ matrix.arch }} --runtime-source ../deepseek-harness/python/sdk-runtime/src/deepseek_harness_runtime/runtime
+          uv run --no-sync pyinstaller --clean --noconfirm packaging/desktop/maestro.spec
+      - name: Smoke test bundled runtime
+        working-directory: app
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          case "$RUNNER_OS" in
+            macOS) binary=dist/Maestro.app/Contents/MacOS/maestro-python ;;
+            Windows) binary=dist/Maestro/maestro-python.exe ;;
+            *) binary=dist/Maestro/maestro-python ;;
+          esac
+          "$binary" --bundle-smoke-test
+          "$binary" --help
+          "$binary" --bundle-integration-smoke
+      - name: Prepare Windows installer tools and signed WebView2 setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: app
+        run: |
+          choco upgrade innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' }
+          Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile build/WebView2Setup.exe
+          $signature = Get-AuthenticodeSignature build/WebView2Setup.exe
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
+            throw 'WebView2 bootstrapper signature verification failed'
+          }
+      - name: Archive app with SHA256 checksum
+        working-directory: app
+        run: uv run --no-sync python scripts/desktop_release.py archive --target ${{ matrix.target }} --arch ${{ matrix.arch }}
+      - name: Verify macOS DMG contents
+        if: runner.os == 'macOS'
+        working-directory: app
+        run: |
+          mount="$RUNNER_TEMP/Maestro mounted"
+          hdiutil attach release-assets/*.dmg -mountpoint "$mount" -nobrowse -readonly
+          trap 'hdiutil detach "$mount"' EXIT
+          test -L "$mount/Applications"
+          codesign --verify --deep --strict "$mount/Maestro.app"
+          "$mount/Maestro.app/Contents/MacOS/maestro-python" --bundle-smoke-test
+          "$mount/Maestro.app/Contents/MacOS/maestro-python" --bundle-integration-smoke
+      - name: Verify installed Windows app and native GUI
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: app
+        run: |
+          $installer = Get-ChildItem release-assets/*.exe
+          $destination = Join-Path $env:RUNNER_TEMP 'Installed Maestro'
+          $installation = Start-Process $installer.FullName -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR=`"$destination`"" -Wait -PassThru
+          if ($installation.ExitCode -ne 0) { throw 'Maestro installer failed' }
+          & "$destination/maestro-python.exe" --bundle-smoke-test
+          if ($LASTEXITCODE -ne 0) { throw 'Installed runtime failed' }
+          & "$destination/maestro-python.exe" --bundle-integration-smoke
+          if ($LASTEXITCODE -ne 0) { throw 'Installed credential handoff failed' }
+          $receipt = Join-Path $env:RUNNER_TEMP 'maestro-native-gui.json'
+          $application = Start-Process "$destination/Maestro.exe" -ArgumentList "--bundle-gui-smoke --smoke-receipt `"$receipt`"" -PassThru
+          if (-not $application.WaitForExit(150000)) {
+            Stop-Process -Id $application.Id -Force
+            if (Test-Path $receipt) { Get-Content $receipt }
+            throw 'Native GUI check timed out'
+          }
+          if (Test-Path $receipt) { Get-Content $receipt }
+          if ($application.ExitCode -ne 0 -or -not (Test-Path $receipt)) { throw 'Native GUI failed' }
+          $result = Get-Content $receipt | ConvertFrom-Json
+          if ($result.native_gui -ne 'passed' -or $result.native_secret_input -ne 'passed' -or $result.credential_handoff -ne 'passed' -or $result.shutdown -ne 'passed') {
+            throw 'Installed desktop checks did not pass'
+          }
+          Get-Content $receipt
+          & "$destination/unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+          if ($LASTEXITCODE -ne 0) { throw 'Uninstall failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.target }}-${{ matrix.arch }}
+          path: app/release-assets/*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish versioned GitHub Release
+    needs: build
+    if: >-
+      always() && github.ref == 'refs/heads/main' &&
+      ((github.event_name == 'push' && needs.build.result == 'success') ||
+       (github.event_name == 'workflow_dispatch' && inputs.artifact_run_id != ''))
+    runs-on: ${{ fromJSON(vars.CI_RUNNERS || '{}')['ubuntu-22.04'] || 'ubuntu-22.04' }}
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: desktop-release-publisher
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - name: Verify recovery build receipt
+        if: github.event_name == 'workflow_dispatch'
+        id: receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ inputs.artifact_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$RUN_ID" =~ ^[0-9]+$ ]]
+          gh api "repos/$GH_REPO/actions/runs/$RUN_ID" > /tmp/build-receipt.json
+          jq -e --arg repo "$GH_REPO" '.event == "push" and .head_branch == "main" and .path == ".github/workflows/desktop.yml" and .head_repository.full_name == $repo and .status == "completed"' /tmp/build-receipt.json
+          passed=$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/jobs?per_page=100" --jq '[.jobs[] | select(.name == "macos-arm64" or .name == "macos-x64" or .name == "linux-arm64" or .name == "linux-x64" or .name == "win-x64") | select(.conclusion == "success")] | length')
+          [[ "$passed" == 5 ]]
+          count=$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/artifacts" --jq '[.artifacts[] | select(.expired == false and (.name | startswith("desktop-")))] | length')
+          [[ "$count" == 5 ]]
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "sha=$(jq -r .head_sha /tmp/build-receipt.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.receipt.outputs.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: release-assets
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.receipt.outputs.run_id || github.run_id }}
+      - name: Verify downloaded archives
+        run: |
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          receipts = list(Path("release-assets").glob("*.sha256"))
+          assert len(receipts) == 5, "expected five platform checksums"
+          for receipt in receipts:
+              digest, name = receipt.read_text().split()
+              assert Path(name).name == name
+              with (receipt.parent / name).open("rb") as stream:
+                  assert hashlib.file_digest(stream, "sha256").hexdigest() == digest
+              print("Verified", name)
+          PY
+      - name: Publish only an unreleased version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_SHA: ${{ steps.receipt.outputs.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          version=$(python scripts/desktop_release.py version)
+          tag="v$version"
+          # Query the complete list: auth/network failures must fail, never look like 404.
+          gh api --paginate "repos/$GH_REPO/releases" --jq '.[].tag_name' > /tmp/release-tags
+          if grep -Fxq "$tag" /tmp/release-tags; then
+            if [ "$(gh release view "$tag" --json isDraft --jq .isDraft)" = true ]; then
+              gh api "repos/$GH_REPO/git/matching-refs/tags/$tag" --jq '.[].ref' > /tmp/draft-ref
+              if grep -Fxq "refs/tags/$tag" /tmp/draft-ref; then
+                target=$(gh api "repos/$GH_REPO/git/ref/tags/$tag" --jq .object.sha)
+              else
+                id=$(gh release view "$tag" --json databaseId --jq .databaseId)
+                target=$(gh api "repos/$GH_REPO/releases/$id" --jq .target_commitish)
+              fi
+              [[ "$target" == "$RELEASE_SHA" ]]
+              gh release upload "$tag" release-assets/* --clobber
+              gh release edit "$tag" --draft=false
+              exit 0
+            fi
+            echo "$tag already released; this commit remains available as Actions artifacts."
+            exit 0
+          fi
+          # Creating a tag must never attach new binaries to an unrelated old commit.
+          gh api "repos/$GH_REPO/git/matching-refs/tags/$tag" --jq '.[].ref' > /tmp/release-ref
+          tag_args=(--target "$RELEASE_SHA")
+          if grep -Fxq "refs/tags/$tag" /tmp/release-ref; then
+            tagged_sha=$(gh api "repos/$GH_REPO/git/ref/tags/$tag" --jq .object.sha)
+            if [ "$tagged_sha" != "$RELEASE_SHA" ]; then
+              echo "::error::Tag $tag points to a different commit; refusing to replace it."
+              exit 1
+            fi
+            # The verified existing tag identifies the commit. Omitting
+            # target_commitish avoids GitHub's historical workflow-SHA guard.
+            tag_args=(--verify-tag)
+          fi
+          gh release create "$tag" release-assets/* "${tag_args[@]}" --title "Maestro $version" --generate-notes --draft
+          gh release edit "$tag" --draft=false
+      - name: Update rolling main build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_SHA: ${{ steps.receipt.outputs.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          tag=main-build
+          notes="Development binaries from main commit $RELEASE_SHA. Versioned releases are the stable downloads. See packaging/desktop/README.md for platform requirements."
+          gh api --paginate "repos/$GH_REPO/releases" --jq '.[].tag_name' > /tmp/release-tags
+          if grep -Fxq "$tag" /tmp/release-tags; then
+            release_id=$(gh release view "$tag" --json databaseId --jq .databaseId)
+            gh api --method PATCH "repos/$GH_REPO/git/refs/tags/$tag" -f sha="$RELEASE_SHA" -F force=true
+            gh release edit "$tag" --draft=true --prerelease --latest=false --notes "$notes"
+            # The tag endpoint only returns published releases; use the ID
+            # while replacing the draft's assets.
+            gh api "repos/$GH_REPO/releases/$release_id" --jq '.assets[].id' > /tmp/main-build-assets
+            while read -r asset; do
+              gh api --method DELETE "repos/$GH_REPO/releases/assets/$asset"
+            done < /tmp/main-build-assets
+            gh release upload "$tag" release-assets/*
+          else
+            gh api "repos/$GH_REPO/git/matching-refs/tags/$tag" --jq '.[].ref' > /tmp/preview-ref
+            tag_args=(--target "$RELEASE_SHA")
+            if grep -Fxq "refs/tags/$tag" /tmp/preview-ref; then
+              [[ "$(gh api "repos/$GH_REPO/git/ref/tags/$tag" --jq .object.sha)" == "$RELEASE_SHA" ]]
+              tag_args=(--verify-tag)
+            fi
+            gh release create "$tag" release-assets/* "${tag_args[@]}" --title 'Maestro main build' --notes "$notes" --prerelease --latest=false --draft
+          fi
+          gh release edit "$tag" --draft=false --prerelease --latest=false

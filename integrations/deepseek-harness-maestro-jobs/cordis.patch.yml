@@ -1,0 +1,7 @@
+# Host-plane producer for user-visible MAESTRO background jobs. The process-local
+# registry is supplied by dsh-base; each Web Agent preset supplies tool-jobs, whose
+# controller owns listing, output reads, cancellation, and completion notices.
+- insert:
+    - id: maestro-care-background-jobs
+      name: '@maestro-care/deepseek-harness-maestro-jobs'
+      inject: [tools, jobs]

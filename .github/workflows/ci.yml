@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  # Allow other workflows (e.g. mirror.yml) to gate on lint + tests by
+  # calling this workflow as a reusable job.
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    name: Lint + tests (py${{ matrix.python }})
+    runs-on: ${{ fromJSON(vars.CI_RUNNERS || '{}')['ubuntu-latest'] || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          # uv.lock is .gitignored (absent in CI), so the default
+          # `**/uv.lock` cache key matches nothing and setup-uv errors.
+          # Key the cache on pyproject.toml instead.
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Set up Python ${{ matrix.python }}
+        run: uv venv --python ${{ matrix.python }}
+
+      - name: Sync dev dependencies
+        run: uv pip install '.[dev,carl,openai,anthropic]'
+
+      - name: Run ruff
+        # Explicit defaults avoid inheriting unrelated parent-directory configs.
+        run: uv run --no-sync ruff check --isolated --select E4,E7,E9,F .
+
+      - name: Run pytest
+        run: |
+          uv run --no-sync pytest tests/test_packaging.py \
+            tests/test_desktop_release.py tests/test_deepseek_host.py \
+            tests/test_desktop_client_bootstrap.py \
+            tests/test_windows_credentials.py tests/test_credential_broker.py \
+            tests/test_credential_broker_noninteractive.py \
+            tests/test_desktop.py tests/test_screen_save_report.py \
+            tests/test_generation.py tests/test_generation_deployable_boundary.py \
+            tests/test_harness_generation.py tests/test_memory.py \
+            tests/test_harness_memory_write.py tests/test_screen_multi_compose.py \
+            -q --maxfail=1

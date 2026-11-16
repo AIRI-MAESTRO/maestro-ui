@@ -1,0 +1,36 @@
+{
+  "rev": "c101e9c9098b",
+  "entries": [
+    {
+      "id": "@maestro-care/dsh-client-ui-settings",
+      "url": "/plugins/??@maestro-care/dsh-client-ui-settings/client.js&rev=5a221059ea198cf9-0",
+      "rev": "5a221059ea198cf9-0",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings"
+      ],
+      "immediately": true
+    },
+    {
+      "id": "@maestro-care/dsh-client-ui-branding",
+      "url": "/plugins/??@maestro-care/dsh-client-ui-branding/client.js&rev=5a221059ea198cf9-1",
+      "rev": "5a221059ea198cf9-1",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-theme"
+      ]
+    }
+  ],
+  "batches": [
+    {
+      "phase": "application",
+      "url": "/plugins/??@maestro-care/dsh-client-ui-settings/client.js,@maestro-care/dsh-client-ui-branding/client.js&rev=f1af95706179",
+      "rev": "f1af95706179",
+      "entries": [
+        "@maestro-care/dsh-client-ui-settings",
+        "@maestro-care/dsh-client-ui-branding"
+      ]
+    }
+  ]
+}

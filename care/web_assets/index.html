@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="en" data-theme="system">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#faf6ef">
+    <meta name="color-scheme" content="light dark">
+    <title>MAESTRO</title>
+    <link rel="icon" href="maestro-mark.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#conversation">Skip to conversation</a>
+
+    <div class="app-shell" id="app-shell">
+      <button
+        class="sidebar-scrim"
+        id="sidebar-scrim"
+        type="button"
+        aria-label="Close run history"
+        tabindex="-1"
+      ></button>
+
+      <aside class="sidebar" id="sidebar" aria-label="Run history">
+        <div class="sidebar-brand-row">
+          <a class="brand" href="/" aria-label="Maestro home">
+            <img src="maestro-mark.svg" alt="" width="34" height="34">
+            <span class="brand-lockup">
+              <span class="brand-wordmark">MAESTRO</span>
+              <span class="brand-care">HARNESS</span>
+            </span>
+          </a>
+          <button
+            class="icon-button sidebar-close-button"
+            id="sidebar-close"
+            type="button"
+            aria-label="Close run history"
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+
+        <button class="new-run-button" id="new-run-button" type="button">
+          <span class="new-run-icon" aria-hidden="true">+</span>
+          <span>New chat</span>
+        </button>
+
+        <div class="history-heading-row">
+          <h2>Recent runs</h2>
+          <button
+            class="icon-button refresh-button"
+            id="refresh-history"
+            type="button"
+            aria-label="Refresh run history"
+            title="Refresh run history"
+          >
+            <span aria-hidden="true">↻</span>
+          </button>
+        </div>
+
+        <div class="history-region" id="history-region">
+          <div class="history-state" id="history-state" role="status">
+            <span class="spinner" aria-hidden="true"></span>
+            <span>Loading runs…</span>
+          </div>
+          <nav class="history-list" id="history-list" aria-label="Recent runs"></nav>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="theme-picker" role="group" aria-label="Color theme">
+            <button type="button" data-theme-value="system" aria-pressed="true">Auto</button>
+            <button type="button" data-theme-value="light" aria-pressed="false">Warm</button>
+            <button type="button" data-theme-value="dark" aria-pressed="false">Crystal</button>
+          </div>
+          <div class="service-state" id="service-state" data-state="checking">
+            <span class="service-dot" aria-hidden="true"></span>
+            <span id="service-state-label">Connecting…</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-pane">
+        <header class="status-header">
+          <div class="status-header-leading">
+            <button
+              class="icon-button menu-button"
+              id="sidebar-open"
+              type="button"
+              aria-label="Open run history"
+              aria-controls="sidebar"
+              aria-expanded="false"
+            >
+              <span aria-hidden="true"></span>
+              <span aria-hidden="true"></span>
+              <span aria-hidden="true"></span>
+            </button>
+            <div class="run-heading">
+              <h1 id="run-title">New chat</h1>
+              <div class="run-status" id="run-status" data-tone="idle" aria-live="polite">
+                <span class="run-status-dot" aria-hidden="true"></span>
+                <span id="run-status-label">Ready</span>
+              </div>
+            </div>
+          </div>
+          <div class="status-actions">
+            <button
+              class="secondary-button settings-button"
+              id="settings-button"
+              type="button"
+              aria-haspopup="dialog"
+              aria-controls="settings-dialog"
+              title="Model, provider, keys, and defaults"
+            >
+              <span class="settings-button-icon" aria-hidden="true">⚙</span>
+              <span>Settings</span>
+            </button>
+            <button
+              class="secondary-button command-palette-button"
+              id="command-palette-button"
+              type="button"
+              aria-haspopup="dialog"
+              aria-controls="command-dialog"
+              aria-keyshortcuts="Control+K Meta+K"
+              title="Open command palette"
+            >
+              <span class="command-palette-icon" aria-hidden="true">›_</span>
+              <span class="command-palette-label">Commands</span>
+              <kbd>⌘K</kbd>
+            </button>
+            <div
+              class="maestric-companion"
+              id="maestric-companion"
+              data-mood="idle"
+              role="status"
+              aria-live="polite"
+              aria-label="Maestric status: Ready"
+            >
+              <span class="maestric-avatar-shell" aria-hidden="true">
+                <img
+                  class="maestric-avatar"
+                  id="maestric-avatar"
+                  src="mascot/evoc-coffee.webp"
+                  alt=""
+                  width="48"
+                  height="48"
+                >
+              </span>
+              <span class="maestric-status-bubble">
+                <span>Maestric</span>
+                <strong id="maestric-status-label">Ready</strong>
+              </span>
+            </div>
+            <button class="secondary-button chain-button" id="chain-button" type="button" hidden>
+              <span class="chain-button-icon" aria-hidden="true">◇</span>
+              <span>Chain</span>
+            </button>
+            <button class="danger-button cancel-button" id="cancel-button" type="button" hidden>
+              <span class="stop-icon" aria-hidden="true"></span>
+              <span>Cancel</span>
+            </button>
+          </div>
+        </header>
+
+        <section
+          class="conversation"
+          id="conversation"
+          aria-label="Conversation"
+          tabindex="-1"
+        >
+          <div class="conversation-inner" id="conversation-inner">
+            <section class="empty-state" id="empty-state">
+              <div class="empty-mascot-stage" aria-hidden="true">
+                <span class="empty-mascot-glow"></span>
+                <picture class="empty-mascot-picture">
+                  <source media="(prefers-reduced-motion: reduce)" srcset="mascot/mascot.webp">
+                  <img
+                    class="empty-mascot"
+                    src="mascot/hero-mascot.gif"
+                    alt=""
+                    width="227"
+                    height="256"
+                  >
+                </picture>
+                <span class="empty-mascot-shadow"></span>
+                <span class="mascot-spark mascot-spark-one"></span>
+                <span class="mascot-spark mascot-spark-two"></span>
+                <span class="mascot-spark mascot-spark-three"></span>
+              </div>
+              <p class="eyebrow">MAESTRO</p>
+              <h2>What should we conduct?</h2>
+              <p class="empty-copy">
+                Describe the outcome. Maestro will generate a chain, show every stage, and execute it when you ask.
+              </p>
+              <div class="prompt-suggestions" aria-label="Example prompts">
+                <button type="button" data-suggestion="Summarize this repository and identify its main components.">
+                  Map a repository
+                </button>
+                <button type="button" data-suggestion="Create a reproducible research plan with milestones and validation checks.">
+                  Plan research
+                </button>
+                <button type="button" data-suggestion="Analyze the task, build the best chain, and execute it end to end.">
+                  Run end to end
+                </button>
+              </div>
+            </section>
+
+            <section class="run-view" id="run-view" hidden>
+              <div class="session-transcript" id="session-transcript" aria-label="Session conversation"></div>
+              <article class="message user-message" id="current-user-message">
+                <div class="message-label">You</div>
+                <p id="user-prompt"></p>
+              </article>
+              <div class="timeline" id="event-timeline" aria-label="Run events"></div>
+            </section>
+          </div>
+        </section>
+
+        <div class="composer-region">
+          <div class="slash-menu" id="slash-menu" hidden>
+            <div class="slash-menu-heading">
+              <span>Commands</span>
+              <kbd>↑↓ to browse · Tab to insert</kbd>
+            </div>
+            <div id="slash-command-list" role="listbox" aria-label="Matching Maestro commands"></div>
+          </div>
+
+          <div class="composer-alert" id="composer-alert" role="alert" hidden>
+            <span id="composer-alert-text"></span>
+            <button id="composer-alert-close" type="button" aria-label="Dismiss message">×</button>
+          </div>
+
+          <form class="composer" id="composer-form">
+            <label class="sr-only" for="prompt-input">Tell Maestro what to do</label>
+            <textarea
+              id="prompt-input"
+              name="prompt"
+              rows="1"
+              maxlength="32000"
+              placeholder="Ask Maestro to build a chain…"
+              autocomplete="off"
+              aria-autocomplete="list"
+              aria-controls="slash-command-list"
+              aria-expanded="false"
+              required
+            ></textarea>
+
+            <div class="composer-toolbar">
+              <div class="composer-options">
+                <fieldset class="mode-picker session-mode-picker">
+                  <legend class="sr-only">Session mode</legend>
+                  <label title="Conversational mode with session context">
+                    <input type="radio" name="session-mode" value="interactive" checked>
+                    <span>Chat</span>
+                  </label>
+                  <label title="Production mode for saved agent chains">
+                    <input type="radio" name="session-mode" value="production">
+                    <span>Agent</span>
+                  </label>
+                </fieldset>
+
+                <fieldset class="mode-picker">
+                  <legend class="sr-only">Generation mode</legend>
+                  <label>
+                    <input type="radio" name="mode" value="fast" checked>
+                    <span>Fast</span>
+                  </label>
+                  <label>
+                    <input type="radio" name="mode" value="deep">
+                    <span>Deep</span>
+                  </label>
+                </fieldset>
+
+                <label class="execute-toggle" title="Run the generated chain after validation">
+                  <input id="execute-input" type="checkbox" name="execute" checked>
+                  <span class="toggle-track" aria-hidden="true"><span></span></span>
+                  <span>Execute</span>
+                </label>
+              </div>
+
+              <div class="composer-submit-group">
+                <span class="keyboard-hint" id="keyboard-hint">Shift+Enter for newline</span>
+                <button class="send-button" id="send-button" type="submit" aria-label="Start run">
+                  <span class="send-arrow" aria-hidden="true">↑</span>
+                  <span class="sr-only">Start run</span>
+                </button>
+              </div>
+            </div>
+          </form>
+          <p class="composer-footnote" id="composer-footnote">
+            Maestro can call configured tools when Execute is on. Review important outputs.
+          </p>
+        </div>
+      </main>
+    </div>
+
+    <dialog class="chain-dialog" id="chain-dialog" aria-labelledby="chain-dialog-title">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">GENERATED CHAIN</p>
+          <h2 id="chain-dialog-title">Chain details</h2>
+        </div>
+        <button class="icon-button" id="chain-dialog-close" type="button" aria-label="Close chain details">×</button>
+      </div>
+      <div class="chain-dialog-body" id="chain-dialog-body"></div>
+    </dialog>
+
+    <dialog class="command-dialog" id="command-dialog" aria-labelledby="command-dialog-title">
+      <div class="dialog-header command-dialog-header">
+        <div class="command-dialog-heading">
+          <img src="mascot/evoc-think.webp" alt="" width="44" height="44">
+          <div>
+            <p class="eyebrow">MAESTRO</p>
+            <h2 id="command-dialog-title">Command palette</h2>
+          </div>
+        </div>
+        <button class="icon-button" id="command-dialog-close" type="button" aria-label="Close command palette">×</button>
+      </div>
+      <div class="command-dialog-body">
+        <label class="command-search-shell" for="command-search">
+          <span aria-hidden="true">⌕</span>
+          <input
+            id="command-search"
+            type="search"
+            placeholder="Search commands…"
+            autocomplete="off"
+            aria-controls="command-list"
+          >
+          <kbd>Esc</kbd>
+        </label>
+        <p class="command-manifest-state" id="command-manifest-state" role="status"></p>
+        <div class="command-list" id="command-list" role="list" aria-label="Available Maestro commands"></div>
+      </div>
+    </dialog>
+
+    <dialog class="settings-dialog" id="settings-dialog" aria-labelledby="settings-dialog-title">
+      <form class="settings-form" id="settings-form">
+        <div class="dialog-header settings-dialog-header">
+          <div class="command-dialog-heading">
+            <img src="mascot/evoc-think.webp" alt="" width="52" height="52">
+            <div>
+              <p class="eyebrow">MAESTRO CONFIGURATION</p>
+              <h2 id="settings-dialog-title">Model &amp; runtime settings</h2>
+            </div>
+          </div>
+          <button class="icon-button" id="settings-dialog-close" type="button" aria-label="Close settings">×</button>
+        </div>
+
+        <div class="settings-dialog-body">
+          <div class="settings-security-note">
+            <span aria-hidden="true">⌁</span>
+            <p>
+              Existing keys are never sent to this window. Password fields are always empty;
+              enter a value only to replace a key. On macOS, Maestro talks to
+              Security.framework directly and never asks you to paste a key into a terminal.
+            </p>
+          </div>
+
+          <p class="settings-status" id="settings-status" role="status">Loading settings…</p>
+
+          <div class="settings-grid" id="settings-fields" aria-busy="true">
+            <section class="settings-card settings-card-primary">
+              <div class="settings-card-heading">
+                <div>
+                  <p class="eyebrow">GENERATOR</p>
+                  <h3>Provider and model</h3>
+                </div>
+                <span class="settings-card-badge">OpenAI-compatible</span>
+              </div>
+
+              <div class="settings-field-row settings-field-row-split">
+                <label class="settings-field">
+                  <span>Provider</span>
+                  <select id="settings-provider" name="provider">
+                    <option value="openrouter">OpenRouter</option>
+                    <option value="deepseek">DeepSeek</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="custom">Custom endpoint</option>
+                  </select>
+                </label>
+                <label class="settings-field">
+                  <span>Generation mode</span>
+                  <select id="settings-generation-mode" name="generation_mode">
+                    <option value="fast">Fast</option>
+                    <option value="deep">Deep</option>
+                  </select>
+                </label>
+              </div>
+
+              <label class="settings-field">
+                <span>Base URL</span>
+                <input id="settings-base-url" name="base_url" type="url" maxlength="2048" placeholder="https://api.deepseek.com" spellcheck="false">
+              </label>
+              <label class="settings-field">
+                <span>Model ID</span>
+                <input id="settings-model" name="model" type="text" maxlength="512" placeholder="Enter any model supported by the endpoint" spellcheck="false">
+              </label>
+              <label class="settings-field settings-secret-field">
+                <span>API key <small id="settings-api-key-state">Not configured</small></span>
+                <input id="settings-api-key" name="api_key" type="password" maxlength="16384" placeholder="Leave empty to keep the current key" autocomplete="new-password" spellcheck="false">
+              </label>
+              <label class="settings-remove-key">
+                <input id="settings-api-key-clear" type="checkbox">
+                <span>Remove the current generator key</span>
+              </label>
+            </section>
+
+            <section class="settings-card">
+              <div class="settings-card-heading">
+                <div>
+                  <p class="eyebrow">BEHAVIOUR</p>
+                  <h3>Defaults</h3>
+                </div>
+              </div>
+              <div class="settings-field-row settings-field-row-split">
+                <label class="settings-field">
+                  <span>Default session mode</span>
+                  <select id="settings-default-mode" name="default_mode">
+                    <option value="interactive">Interactive</option>
+                    <option value="production">Production</option>
+                  </select>
+                </label>
+                <label class="settings-field">
+                  <span>Native execute default</span>
+                  <select id="settings-interactive-run" name="interactive_run">
+                    <option value="ask">Ask before run</option>
+                    <option value="auto">Run automatically</option>
+                  </select>
+                </label>
+              </div>
+              <div class="settings-toggle-list">
+                <label class="settings-switch">
+                  <input id="settings-memory-research" type="checkbox">
+                  <span class="toggle-track" aria-hidden="true"><span></span></span>
+                  <span><strong>Memory research</strong><small>Recall useful past chains before planning.</small></span>
+                </label>
+                <label class="settings-switch">
+                  <input id="settings-web-research" type="checkbox">
+                  <span class="toggle-track" aria-hidden="true"><span></span></span>
+                  <span><strong>Web research</strong><small>Allow the planner to use the configured search provider.</small></span>
+                </label>
+                <label class="settings-switch">
+                  <input id="settings-reduced-motion" type="checkbox">
+                  <span class="toggle-track" aria-hidden="true"><span></span></span>
+                  <span><strong>Reduced motion</strong><small>Minimise interface animation.</small></span>
+                </label>
+              </div>
+              <label class="settings-field">
+                <span>CLI/TUI language <small>The native desktop interface is currently English.</small></span>
+                <select id="settings-ui-language" name="ui_language">
+                  <option value="ru">Русский</option>
+                  <option value="en">English</option>
+                </select>
+              </label>
+            </section>
+
+            <section class="settings-card">
+              <div class="settings-card-heading">
+                <div>
+                  <p class="eyebrow">SERVICES</p>
+                  <h3>Memory and evolution</h3>
+                </div>
+              </div>
+              <label class="settings-field">
+                <span>Memory base URL</span>
+                <input id="settings-memory-url" type="url" maxlength="2048" spellcheck="false">
+              </label>
+              <label class="settings-field settings-secret-field">
+                <span>Memory API key <small id="settings-memory-key-state">Not configured</small></span>
+                <input id="settings-memory-key" type="password" maxlength="16384" placeholder="Leave empty to keep" autocomplete="new-password" spellcheck="false">
+              </label>
+              <label class="settings-remove-key">
+                <input id="settings-memory-key-clear" type="checkbox">
+                <span>Remove Memory key</span>
+              </label>
+              <label class="settings-field">
+                <span>Platform base URL</span>
+                <input id="settings-platform-url" type="url" maxlength="2048" spellcheck="false">
+              </label>
+              <label class="settings-field settings-secret-field">
+                <span>Platform API key <small id="settings-platform-key-state">Not configured</small></span>
+                <input id="settings-platform-key" type="password" maxlength="16384" placeholder="Leave empty to keep" autocomplete="new-password" spellcheck="false">
+              </label>
+              <label class="settings-remove-key">
+                <input id="settings-platform-key-clear" type="checkbox">
+                <span>Remove Platform key</span>
+              </label>
+
+              <details class="settings-advanced">
+                <summary>Evolution model settings</summary>
+                <div class="settings-advanced-body">
+                  <p class="settings-subheading">Mutation model</p>
+                  <label class="settings-field">
+                    <span>Base URL</span>
+                    <input id="settings-mutation-url" type="url" maxlength="2048" spellcheck="false">
+                  </label>
+                  <label class="settings-field">
+                    <span>Model ID</span>
+                    <input id="settings-mutation-model" type="text" maxlength="512" spellcheck="false">
+                  </label>
+                  <label class="settings-field settings-secret-field">
+                    <span>API key <small id="settings-mutation-key-state">Not configured</small></span>
+                    <input id="settings-mutation-key" type="password" maxlength="16384" placeholder="Leave empty to keep" autocomplete="new-password" spellcheck="false">
+                  </label>
+                  <label class="settings-remove-key">
+                    <input id="settings-mutation-key-clear" type="checkbox">
+                    <span>Remove mutation key</span>
+                  </label>
+
+                  <p class="settings-subheading">Validation model</p>
+                  <label class="settings-field">
+                    <span>Base URL</span>
+                    <input id="settings-validation-url" type="url" maxlength="2048" spellcheck="false">
+                  </label>
+                  <label class="settings-field">
+                    <span>Model ID</span>
+                    <input id="settings-validation-model" type="text" maxlength="512" spellcheck="false">
+                  </label>
+                  <label class="settings-field settings-secret-field">
+                    <span>API key <small id="settings-validation-key-state">Not configured</small></span>
+                    <input id="settings-validation-key" type="password" maxlength="16384" placeholder="Leave empty to keep" autocomplete="new-password" spellcheck="false">
+                  </label>
+                  <label class="settings-remove-key">
+                    <input id="settings-validation-key-clear" type="checkbox">
+                    <span>Remove validation key</span>
+                  </label>
+                </div>
+              </details>
+            </section>
+
+            <section class="settings-card">
+              <div class="settings-card-heading">
+                <div>
+                  <p class="eyebrow">TOOLS</p>
+                  <h3>Web search</h3>
+                </div>
+              </div>
+              <label class="settings-field">
+                <span>Search provider</span>
+                <select id="settings-search-provider">
+                  <option value="tavily">Tavily</option>
+                  <option value="serper">Serper</option>
+                  <option value="exa">Exa</option>
+                  <option value="serpapi">SerpAPI</option>
+                  <option value="brave">Brave</option>
+                  <option value="duckduckgo">DuckDuckGo (no key)</option>
+                </select>
+              </label>
+              <label class="settings-field settings-secret-field">
+                <span>Search API key <small id="settings-search-key-state">Not configured</small></span>
+                <input id="settings-search-key" type="password" maxlength="16384" placeholder="Leave empty to keep" autocomplete="new-password" spellcheck="false">
+              </label>
+              <label class="settings-remove-key">
+                <input id="settings-search-key-clear" type="checkbox">
+                <span>Remove search key</span>
+              </label>
+              <p class="settings-card-note">DuckDuckGo works without a key and remains the safe fallback.</p>
+
+              <p class="settings-subheading">Chain upload</p>
+              <label class="settings-field settings-secret-field">
+                <span>Upload API key <small id="settings-upload-key-state">Not configured</small></span>
+                <input id="settings-upload-key" type="password" maxlength="16384" placeholder="Leave empty to keep" autocomplete="new-password" spellcheck="false">
+              </label>
+              <label class="settings-remove-key">
+                <input id="settings-upload-key-clear" type="checkbox">
+                <span>Remove upload key</span>
+              </label>
+              <p class="settings-card-note">The upload endpoint and auth-header name remain configured in MAESTRO advanced settings.</p>
+            </section>
+          </div>
+        </div>
+
+        <div class="settings-actions">
+          <p>Saving writes <code>config.toml</code> and <code>.env</code>; secrets become Keychain references. Existing environment overrides still take precedence on the next launch.</p>
+          <div>
+            <button class="secondary-button" id="settings-cancel" type="button">Cancel</button>
+            <button class="confirm-command-button" id="settings-save" type="submit">Review &amp; save</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog
+      class="memory-editor-dialog"
+      id="memory-editor-dialog"
+      aria-labelledby="memory-editor-title"
+      aria-describedby="memory-editor-description memory-editor-status"
+    >
+      <form class="memory-editor-form" id="memory-editor-form">
+        <div class="dialog-header memory-editor-header">
+          <div class="command-dialog-heading">
+            <img src="mascot/evoc-work.webp" alt="" width="48" height="48">
+            <div>
+              <p class="eyebrow">WORKSPACE INSTRUCTIONS</p>
+              <h2 id="memory-editor-title">Edit CARE.md</h2>
+            </div>
+          </div>
+          <button class="icon-button" id="memory-editor-close" type="button" aria-label="Close CARE.md editor">×</button>
+        </div>
+        <div class="memory-editor-body">
+          <p id="memory-editor-description">
+            These instructions shape Maestro's behaviour in this workspace. Saving requires a separate filesystem confirmation.
+          </p>
+          <div class="memory-editor-warning" id="memory-editor-warning" role="alert" hidden></div>
+          <label class="memory-editor-field" for="memory-editor-content">
+            <span>CARE.md</span>
+            <textarea
+              id="memory-editor-content"
+              rows="18"
+              wrap="off"
+              spellcheck="false"
+              autocomplete="off"
+              autocapitalize="off"
+              aria-describedby="memory-editor-meta memory-editor-status"
+            ></textarea>
+          </label>
+          <div class="memory-editor-footer-copy">
+            <span id="memory-editor-meta">UTF-8 · 0 bytes</span>
+            <span id="memory-editor-status" role="status" aria-live="polite"></span>
+          </div>
+        </div>
+        <div class="memory-editor-actions">
+          <p>The document stays out of chat, command history, and confirmation previews.</p>
+          <div>
+            <button class="secondary-button" id="memory-editor-cancel" type="button">Cancel</button>
+            <button class="confirm-command-button" id="memory-editor-save" type="submit">Review &amp; save</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog
+      class="command-confirmation-dialog"
+      id="command-confirmation-dialog"
+      aria-labelledby="command-confirmation-title"
+      aria-describedby="command-confirmation-reason"
+    >
+      <div class="confirmation-hero">
+        <img src="mascot/evoc-surprised.webp" alt="" width="58" height="58">
+        <div>
+          <p class="eyebrow">EXPLICIT CONFIRMATION</p>
+          <h2 id="command-confirmation-title">Allow this command?</h2>
+        </div>
+      </div>
+      <div class="confirmation-body">
+        <span class="command-risk" id="command-confirmation-risk">Side effects</span>
+        <p id="command-confirmation-reason"></p>
+        <pre class="confirmation-command" id="command-confirmation-command"></pre>
+        <div class="confirmation-effects" id="command-confirmation-effects" hidden>
+          <h3>Possible effects</h3>
+          <ul id="command-confirmation-effects-list"></ul>
+        </div>
+        <p class="confirmation-note">Maestro will not run it unless you confirm here.</p>
+      </div>
+      <div class="confirmation-actions">
+        <button class="secondary-button" id="command-confirmation-cancel" type="button">Cancel</button>
+        <button class="confirm-command-button" id="command-confirmation-confirm" type="button">Confirm and run</button>
+      </div>
+    </dialog>
+
+    <div class="sr-only" id="announcer" role="status" aria-live="polite"></div>
+  </body>
+</html>

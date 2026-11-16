@@ -1,0 +1,20 @@
+{
+  "name": "@maestro-care/deepseek-harness-maestro-preset",
+  "version": "0.1.9",
+  "private": true,
+  "type": "module",
+  "description": "MAESTRO resident-agent preset",
+  "main": "./preset-root.mjs",
+  "files": [
+    "cordis.patch.yml",
+    "preset-root.mjs",
+    "agent-presets",
+    "upstream-standard.json",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

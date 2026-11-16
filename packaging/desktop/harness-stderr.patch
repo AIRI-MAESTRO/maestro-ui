@@ -1,0 +1,295 @@
+diff --git a/packages/mcp/mcp-client/src/index.ts b/packages/mcp/mcp-client/src/index.ts
+index 59ef928751..6a367697cc 100644
+--- a/packages/mcp/mcp-client/src/index.ts
++++ b/packages/mcp/mcp-client/src/index.ts
+@@ -60,6 +60,8 @@ export interface StdioConfig {
+   command: string
+   /** Arguments passed directly, without shell interpolation. */
+   args: string[]
++  /** Optional trusted inherited descriptor for the resident credential channel. */
++  stderrFd?: number
+   /** Extra env vars merged on top of scrubbed ambient env. */
+   env: Record<string, string>
+   /** Working directory for the child process. */
+@@ -116,6 +118,7 @@ export const Config = z.union([
+     serverName: z.string().required().pattern(SERVER_NAME_PATTERN),
+     command: z.string().required(),
+     args: z.array(String).default([]),
++    stderrFd: z.number().min(3).step(1),
+     env: z.dict(String).default({}),
+     cwd: z.string().default(''),
+     toolCallTimeoutMs: z.number().default(DEFAULT_TOOL_CALL_TIMEOUT_MS),
+diff --git a/packages/mcp/mcp-client/src/transport.ts b/packages/mcp/mcp-client/src/transport.ts
+index bc7fd1cc08..df8807a96e 100644
+--- a/packages/mcp/mcp-client/src/transport.ts
++++ b/packages/mcp/mcp-client/src/transport.ts
+@@ -36,6 +36,7 @@ export function createTransport(config: Config): Transport {
+         args: config.args,
+         env: buildChildEnv(config.env),
+         cwd: config.cwd,
++        ...(config.stderrFd == null ? {} : { stderr: config.stderrFd }),
+       })
+     case 'streamable-http':
+       // The MCP SDK's StreamableHTTPClientTransport has optional callback
+diff --git a/packages/preset/agent-presets/src/discovery.ts b/packages/preset/agent-presets/src/discovery.ts
+index 8d39410b00..cbd96507c5 100644
+--- a/packages/preset/agent-presets/src/discovery.ts
++++ b/packages/preset/agent-presets/src/discovery.ts
+@@ -22,7 +22,7 @@
+  */
+ 
+ import { existsSync } from 'node:fs'
+-import { readdir, readFile, stat } from 'node:fs/promises'
++import { readdir, readFile, stat, lstat } from 'node:fs/promises'
+ import { isBuiltin } from 'node:module'
+ import { dirname, join, resolve } from 'node:path'
+ import { fileURLToPath, pathToFileURL } from 'node:url'
+@@ -293,15 +293,16 @@ export async function scanRoot(root: PresetRoot, harnessBase: string): Promise<A
+   const dir = resolve(expandHomePath(root.path))
+   let children
+   try {
+-    children = await readdir(dir, { withFileTypes: true })
++    children = await readdir(dir)
+   } catch (error) {
+     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+     throw new Error(`agent-presets: cannot read preset root ${dir}: ${String(error)}`, { cause: error })
+   }
+   const found: AgentPreset[] = []
+   for (const child of children) {
+-    if (!child.isDirectory() || !PRESET_ID.test(child.name)) continue
+-    const directory = join(dir, child.name)
++    if (!PRESET_ID.test(child)) continue
++    const directory = join(dir, child)
++    if (!(await lstat(directory)).isDirectory()) continue
+     const path = join(directory, COMPOSITION_FILE)
+     const broken = await isFile(path)
+       ? await compositionProblem(path, harnessBase)
+@@ -310,7 +311,7 @@ export async function scanRoot(root: PresetRoot, harnessBase: string): Promise<A
+     // still mounts, it just shows its id.
+     const metadata = await readPresetMetadata(directory)
+     found.push({
+-      id: child.name, trust: root.trust, path, ...metadata,
++      id: child, trust: root.trust, path, ...metadata,
+       ...broken === undefined ? {} : { broken },
+     })
+   }
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 51de950c3e..889f47f697 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -10308,6 +10308,66 @@ importers:
+ 
+   python/sdk-runtime:
+     dependencies:
++      '@deepseek-ai/dsh-agent-default-model':
++        specifier: workspace:^
++        version: link:../../packages/core/agent-default-model
++      '@deepseek-ai/dsh-agent-presets':
++        specifier: workspace:^
++        version: link:../../packages/preset/agent-presets
++      '@deepseek-ai/dsh-api-gateway':
++        specifier: workspace:^
++        version: link:../../packages/api/gateway
++      '@deepseek-ai/dsh-client-connection':
++        specifier: workspace:^
++        version: link:../../packages/client/connection
++      '@deepseek-ai/dsh-client-ui-directory-picker-browse':
++        specifier: workspace:^
++        version: link:../../packages/client/ui-directory-picker-browse
++      '@deepseek-ai/dsh-client-ui-directory-picker-native':
++        specifier: workspace:^
++        version: link:../../packages/client/ui-directory-picker-native
++      '@deepseek-ai/dsh-command-feedback':
++        specifier: workspace:^
++        version: link:../../packages/feedback/command-feedback
++      '@deepseek-ai/dsh-file-reference':
++        specifier: workspace:^
++        version: link:../../packages/context/file-reference
++      '@deepseek-ai/dsh-host-directory-picker':
++        specifier: workspace:^
++        version: link:../../packages/host/directory-picker
++      '@deepseek-ai/dsh-host-directory-picker-browse':
++        specifier: workspace:^
++        version: link:../../packages/host/directory-picker-browse
++      '@deepseek-ai/dsh-host-directory-picker-native':
++        specifier: workspace:^
++        version: link:../../packages/host/directory-picker-native
++      '@deepseek-ai/dsh-host-webserver':
++        specifier: workspace:^
++        version: link:../../packages/host/webserver
++      '@deepseek-ai/dsh-native-command':
++        specifier: workspace:^
++        version: link:../../packages/util/native-command
++      '@deepseek-ai/dsh-session-title-llm':
++        specifier: workspace:^
++        version: link:../../packages/session/session-title-llm
++      '@deepseek-ai/dsh-storage':
++        specifier: workspace:^
++        version: link:../../packages/storage/storage
++      '@deepseek-ai/dsh-storage-domain':
++        specifier: workspace:^
++        version: link:../../packages/storage/storage-domain
++      '@deepseek-ai/dsh-typert-registry':
++        specifier: workspace:^
++        version: link:../../packages/typert/registry
++      '@deepseek-ai/dsh-util-workspace-path':
++        specifier: workspace:^
++        version: link:../../packages/util/workspace-path
++      '@deepseek-ai/dsh-webhook':
++        specifier: workspace:^
++        version: link:../../packages/webhook/webhook
++      '@deepseek-ai/dsh-workspace':
++        specifier: workspace:^
++        version: link:../../packages/workspace/workspace
+       '@deepseek-ai/cordis':
+         specifier: workspace:^
+         version: link:../../vendor/cordis
+diff --git a/python/sdk-runtime/package.json b/python/sdk-runtime/package.json
+index 38184d656e..636fca0c98 100644
+--- a/python/sdk-runtime/package.json
++++ b/python/sdk-runtime/package.json
+@@ -78,6 +78,26 @@
+     "@deepseek-ai/dsh-session-reference": "workspace:^",
+     "@deepseek-ai/dsh-session-telemetry": "workspace:^",
+     "@deepseek-ai/dsh-session-title": "workspace:^",
++    "@deepseek-ai/dsh-agent-default-model": "workspace:^",
++    "@deepseek-ai/dsh-agent-presets": "workspace:^",
++    "@deepseek-ai/dsh-api-gateway": "workspace:^",
++    "@deepseek-ai/dsh-client-connection": "workspace:^",
++    "@deepseek-ai/dsh-client-ui-directory-picker-browse": "workspace:^",
++    "@deepseek-ai/dsh-client-ui-directory-picker-native": "workspace:^",
++    "@deepseek-ai/dsh-command-feedback": "workspace:^",
++    "@deepseek-ai/dsh-file-reference": "workspace:^",
++    "@deepseek-ai/dsh-host-directory-picker": "workspace:^",
++    "@deepseek-ai/dsh-host-directory-picker-browse": "workspace:^",
++    "@deepseek-ai/dsh-host-directory-picker-native": "workspace:^",
++    "@deepseek-ai/dsh-host-webserver": "workspace:^",
++    "@deepseek-ai/dsh-native-command": "workspace:^",
++    "@deepseek-ai/dsh-session-title-llm": "workspace:^",
++    "@deepseek-ai/dsh-storage": "workspace:^",
++    "@deepseek-ai/dsh-storage-domain": "workspace:^",
++    "@deepseek-ai/dsh-typert-registry": "workspace:^",
++    "@deepseek-ai/dsh-util-workspace-path": "workspace:^",
++    "@deepseek-ai/dsh-webhook": "workspace:^",
++    "@deepseek-ai/dsh-workspace": "workspace:^",
+     "@deepseek-ai/dsh-settings": "workspace:^",
+     "@deepseek-ai/dsh-skill": "workspace:^",
+     "@deepseek-ai/dsh-skill-filesystem": "workspace:^",
+diff --git a/scripts/verify-runtime-closure.ts b/scripts/verify-runtime-closure.ts
+index b0dac1454b..ae8927c6ef 100644
+--- a/scripts/verify-runtime-closure.ts
++++ b/scripts/verify-runtime-closure.ts
+@@ -199,7 +199,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
+ }
+ 
+ async function loadWorkspacePackages(root: string): Promise<Map<string, WorkspacePackage>> {
+-  const paths = globSync(['packages/*/*/package.json', 'vendor/*/package.json'], { cwd: root })
++  const paths = globSync(['packages/*/*/package.json', 'apps/*/package.json', 'vendor/*/package.json'], { cwd: root })
+     .sort()
+     .map(relative => resolve(root, relative))
+   const result = new Map<string, WorkspacePackage>()
+diff --git a/packages/client/modules/src/index.ts b/packages/client/modules/src/index.ts
+--- a/packages/client/modules/src/index.ts
++++ b/packages/client/modules/src/index.ts
+@@ -825,4 +825,6 @@
+     expectedPackageName?: string,
++    visited = new Set<string>(),
+   ): { path: string; packageName: string } | undefined {
+-    if (!moduleUrl.startsWith('file:')) return undefined
++    if (!moduleUrl.startsWith('file:') || visited.has(moduleUrl)) return undefined
++    visited.add(moduleUrl)
+     let dir = dirname(fileURLToPath(moduleUrl))
+@@ -832,4 +834,16 @@
+         try {
+-          const name = (JSON.parse(readFileSync(candidate, 'utf8')) as { name?: unknown }).name
++          const pkg = JSON.parse(readFileSync(candidate, 'utf8')) as {
++            name?: unknown
++            dsh?: { moduleFallback?: { targets?: Record<string, unknown> } }
++          }
++          const name = pkg.name
+           if (typeof name === 'string' && (expectedPackageName === undefined || name === expectedPackageName)) {
++            // SEA's real profile proxy owns the imported re-export wrapper,
++            // but the original package owns dsh.client and its browser bundle.
++            const original = pkg.dsh?.moduleFallback?.targets?.['.']
++            if (original !== undefined) {
++              return typeof original === 'string'
++                ? this.nearestPackage(original, name, visited)
++                : undefined
++            }
+             return { path: candidate, packageName: name }
+diff --git a/packages/client/modules/tests/node-half.client.spec.ts b/packages/client/modules/tests/node-half.client.spec.ts
+--- a/packages/client/modules/tests/node-half.client.spec.ts
++++ b/packages/client/modules/tests/node-half.client.spec.ts
+@@ -242,2 +242,72 @@
+ describe('client bundle activation', () => {
++  it.each(['cycle', 'foreign-owner', 'non-file'] as const)(
++    'ignores a packaged proxy with a %s origin',
++    (kind) => {
++      writePackage(MODULES_ID)
++      const proxyRoot = join(root!, 'profile', 'node_modules', ...MODULES_ID.split('/'))
++      const proxyEntry = join(proxyRoot, 'entry-0.js')
++      const target = kind === 'cycle' ? pathToFileURL(proxyEntry).href
++        : kind === 'non-file' ? 'data:text/javascript,export default {}'
++          : pathToFileURL(writePackage('@fixture/foreign-owner')).href
++      mkdirSync(proxyRoot, { recursive: true })
++      writeFileSync(join(proxyRoot, 'package.json'), JSON.stringify({
++        name: MODULES_ID, version: '0.1.2-alpha.3', private: true, type: 'module',
++        exports: { '.': './entry-0.js' },
++        dsh: { moduleFallback: { targets: { '.': target } } },
++      }))
++      writeFileSync(proxyEntry, 'export default {}\n')
++      const internal = {
++        version: 'v2' as const,
++        resolveSync: () => ({ format: 'module' as const, url: pathToFileURL(proxyEntry).href }),
++      }
++      const { service } = constructWithRoute([MODULES_ID], {
++        internal: internal as unknown as NonNullable<Context['loader']['internal']>,
++      })
++      expect(service.clientPath(MODULES_ID)).toBeUndefined()
++      expect(service.graph().entries).toEqual([])
++    },
++  )
++
++  it.each(['v1', 'v2'] as const)(
++    'keeps the bootstrap client bundle behind a packaged %s module proxy',
++    async (version) => {
++      const clientPath = writePackage(MODULES_ID)
++      const hostPath = join(dirname(clientPath), 'index.js')
++      mkdirSync(dirname(hostPath), { recursive: true })
++      writeFileSync(hostPath, 'export default {}\n')
++      writeFileSync(clientPath, 'window.__ModuleLoader__.load({ id: "@deepseek-ai/dsh-client-modules", factory: () => ({}) })\n')
++      const proxyRoot = join(root!, 'profile', 'node_modules', ...MODULES_ID.split('/'))
++      const proxyEntry = join(proxyRoot, 'entry-0.js')
++      mkdirSync(proxyRoot, { recursive: true })
++      // This is the manifest emitted by app-boot's ensureModuleProxy in SEA.
++      // Its own client export is an ESM proxy, not the browser registration.
++      writeFileSync(join(proxyRoot, 'package.json'), JSON.stringify({
++        name: MODULES_ID, version: '0.1.2-alpha.3', private: true, type: 'module',
++        exports: { '.': './entry-0.js', './client': './entry-1.js' },
++        dsh: { moduleFallback: { targets: {
++          '.': pathToFileURL(hostPath).href,
++          './client': pathToFileURL(clientPath).href,
++        } } },
++      }))
++      writeFileSync(proxyEntry, `export * from ${JSON.stringify(pathToFileURL(hostPath).href)}\n`)
++      writeFileSync(join(proxyRoot, 'entry-1.js'), `export * from ${JSON.stringify(pathToFileURL(clientPath).href)}\n`)
++      const internal = {
++        version,
++        resolveSync: () => ({ format: 'module' as const, url: pathToFileURL(proxyEntry).href }),
++      }
++      const { service, route } = constructWithRoute([MODULES_ID], {
++        entryBaseUrl: pathToFileURL(join(root!, 'profile')).href + '/',
++        internal: internal as unknown as NonNullable<Context['loader']['internal']>,
++      })
++
++      expect(service.clientPath(MODULES_ID)).toBe(clientPath)
++      const bootstrap = service.graph().batches.find(batch => batch.phase === 'bootstrap')
++      expect(bootstrap?.entries).toEqual([MODULES_ID])
++      const response = await routeRequest(route, bootstrap!.url)
++      expect(response.status).toBe(200)
++      expect(response.body.toString()).toContain('window.__ModuleLoader__.load')
++      expect(response.body.toString()).not.toContain('export * from')
++    },
++  )
++
+   it.each(['v1', 'v2'] as const)(

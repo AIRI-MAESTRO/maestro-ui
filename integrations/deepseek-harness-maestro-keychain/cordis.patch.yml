@@ -1,0 +1,14 @@
+# Disable the pinned base provider before mounting its Keychain replacement.
+# `name` is an upstream-drift guard in the Cordis patch dialect, not a rename.
+- id: credentials
+  name: '@deepseek-ai/dsh-credentials-local'
+  disabled: true
+
+- insert:
+    - id: credentials-maestro-keychain
+      name: '@maestro-care/dsh-credentials-keychain'
+      config:
+        service: app.maestro.care.deepseek-harness
+        # The native host sets this to an owner-controlled cache or packaged
+        # resource. Published packages may omit it and ship the default path.
+        nativeModulePath: !!js process.env.MAESTRO_KEYCHAIN_NATIVE_MODULE

@@ -1,0 +1,20 @@
+{
+  "name": "@maestro-care/deepseek-harness-bundle",
+  "version": "0.1.9",
+  "private": true,
+  "type": "module",
+  "description": "MAESTRO resident-agent capability bundle",
+  "main": "./policy.mjs",
+  "files": [
+    "cordis.patch.yml",
+    "cordis.direct.patch.yml.in",
+    "maestro-harness.json",
+    "policy.mjs",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "maestro-care",
+  "testedDeepSeekHarnessCommit": "dd6322d604e00eec1ba5e0c8541159906a21094a",
+  "mcpServerName": "maestro",
+  "publicToolPrefix": "mcp__maestro__",
+  "readOnlyRawTools": [
+    "maestro_capabilities",
+    "maestro_command_catalog",
+    "maestro_command_review",
+    "maestro_command_status",
+    "maestro_validate_chain",
+    "maestro_chain_input_contract",
+    "maestro_input_adaptation_inspect",
+    "maestro_input_adaptation_preview",
+    "maestro_memory_search",
+    "maestro_memory_get_chain",
+    "maestro_evolution_status"
+  ],
+  "maestroToolDefaultDecision": "ask"
+}
