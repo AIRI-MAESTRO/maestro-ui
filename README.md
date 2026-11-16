@@ -10,10 +10,10 @@ the **agent chain generator** for chain generation, the **agent chain
 format** for execution, **GigaEvo Memory** for persistence, and
 **GigaEvo Platform** for evolution.
 
-Desktop builds for macOS, Windows and Linux are produced on pushes to `main`.
+Start desktop builds for macOS, Windows and Linux manually from **Actions → Desktop builds**.
 Download versioned binaries from [GitHub Releases](https://github.com/AIRI-MAESTRO/maestro-ui/releases).
 The [`main-build` prerelease](https://github.com/AIRI-MAESTRO/maestro-ui/releases/tag/main-build)
-tracks the latest successful push.
+tracks the most recent build published through the workflow.
 See [desktop CI and release instructions](packaging/desktop/README.md) for the
 target matrix, version bumps, runtime requirements and signing status.
 

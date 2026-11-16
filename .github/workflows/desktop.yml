@@ -1,13 +1,14 @@
 name: Desktop builds
 
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
     inputs:
+      publish_release:
+        description: Publish installers to GitHub Releases after verification
+        default: false
+        type: boolean
       artifact_run_id:
-        description: 'Optional: retry publishing a completed main build without rebuilding'
+        description: 'Optional: publish a completed main build without rebuilding (also enable publish_release)'
         required: false
         type: string
 
@@ -22,7 +23,7 @@ concurrency:
 
 jobs:
   build:
-    if: github.event_name != 'workflow_dispatch' || inputs.artifact_run_id == ''
+    if: inputs.artifact_run_id == ''
     name: ${{ matrix.target }}-${{ matrix.arch }}
     # Cold Linux ARM and native Mac builds exceeded their original job limits.
     # Leave setup and cleanup time inside the four-hour supervision envelopes.
@@ -155,7 +156,14 @@ jobs:
         run: |
           mount="$RUNNER_TEMP/Maestro mounted"
           hdiutil attach release-assets/*.dmg -mountpoint "$mount" -nobrowse -readonly
-          trap 'hdiutil detach "$mount"' EXIT
+          detach_dmg() {
+            for attempt in 1 2 3; do
+              hdiutil detach "$mount" && return 0
+              sleep "$attempt"
+            done
+            hdiutil detach -force "$mount"
+          }
+          trap detach_dmg EXIT
           test -L "$mount/Applications"
           codesign --verify --deep --strict "$mount/Maestro.app"
           "$mount/Maestro.app/Contents/MacOS/maestro-python" --bundle-smoke-test
@@ -200,9 +208,8 @@ jobs:
     name: Publish versioned GitHub Release
     needs: build
     if: >-
-      always() && github.ref == 'refs/heads/main' &&
-      ((github.event_name == 'push' && needs.build.result == 'success') ||
-       (github.event_name == 'workflow_dispatch' && inputs.artifact_run_id != ''))
+      always() && !cancelled() && github.ref == 'refs/heads/main' && inputs.publish_release &&
+      (needs.build.result == 'success' || inputs.artifact_run_id != '')
     runs-on: ${{ fromJSON(vars.CI_RUNNERS || '{}')['ubuntu-22.04'] || 'ubuntu-22.04' }}
     timeout-minutes: 10
     permissions:
@@ -214,7 +221,7 @@ jobs:
       queue: max
     steps:
       - name: Verify recovery build receipt
-        if: github.event_name == 'workflow_dispatch'
+        if: inputs.artifact_run_id != ''
         id: receipt
         env:
           GH_TOKEN: ${{ github.token }}
@@ -224,7 +231,7 @@ jobs:
           set -euo pipefail
           [[ "$RUN_ID" =~ ^[0-9]+$ ]]
           gh api "repos/$GH_REPO/actions/runs/$RUN_ID" > /tmp/build-receipt.json
-          jq -e --arg repo "$GH_REPO" '.event == "push" and .head_branch == "main" and .path == ".github/workflows/desktop.yml" and .head_repository.full_name == $repo and .status == "completed"' /tmp/build-receipt.json
+          jq -e --arg repo "$GH_REPO" '(.event == "push" or .event == "workflow_dispatch") and .head_branch == "main" and .path == ".github/workflows/desktop.yml" and .head_repository.full_name == $repo and .status == "completed"' /tmp/build-receipt.json
           passed=$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/jobs?per_page=100" --jq '[.jobs[] | select(.name == "macos-arm64" or .name == "macos-x64" or .name == "linux-arm64" or .name == "linux-x64" or .name == "win-x64") | select(.conclusion == "success")] | length')
           [[ "$passed" == 5 ]]
           count=$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/artifacts" --jq '[.artifacts[] | select(.expired == false and (.name | startswith("desktop-")))] | length')

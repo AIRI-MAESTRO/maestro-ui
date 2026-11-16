@@ -1,6 +1,13 @@
 # Desktop CI and releases
 
-`.github/workflows/desktop.yml` builds on every push to `main`, on pull requests,
+Start **Actions → Desktop builds → Run workflow** to build verified installers.
+The default run uploads installers as Actions artifacts for manual publication.
+Select `main` and enable `publish_release` to publish after all five builds pass.
+To publish a previous successful `main` build, enable `publish_release` and
+enter its run ID in `artifact_run_id`.
+
+
+`.github/workflows/desktop.yml` builds when manually requested, on pull requests,
 and on manual dispatch. Each target runs on its own native GitHub runner:
 
 | Platform | Architectures | Download |
